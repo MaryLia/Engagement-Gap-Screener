@@ -1,6 +1,6 @@
 # Engagement–Performance Gap Screener
 
-A single-file, fully offline web app that helps instructors spot exam scores that are unusually high relative to a student's logged engagement with the Blackboard Ultra course (LMS hours) and the VitalSource textbook (reading time).
+A single-file, fully offline web app that helps instructors spot exam scores that are unusually high relative to a student's logged engagement with the Blackboard Ultra course (LMS hours) and the VitalSource textbook (reading time). Intended to specifically identify remote testing scores for exams taken with Respondus Monitor (or other remote proctoring services) for 2nd review by human proctors. 
 
 > **This is a screening aid, not evidence of academic misconduct.** A high exam score with low logged engagement is also exactly what a well-prepared student who studies offline, uses a print textbook, or has prior knowledge of the material looks like. Treat a "Review Priority" flag as a reason to look more closely, never as a conclusion.
 
@@ -47,7 +47,7 @@ Headers are matched case-insensitively. Comma- and tab-delimited files are both 
 
 `Last Name, First Name, Username, Student ID, Overall Grade, Overall Grade Alert, Missed Due Dates, Missed Due Dates Alert, Hours in Course, Last Access Date, Days Since Last Access, Days Since Last Access Alert`
 
-### 2. Textbook engagement (publisher export)
+### 2. VitalSource Textbook engagement (VitalSource export)
 
 `Student Name, Total Time(seconds), Avg. Session Length (seconds), Sessions, Pages, Annotations, Last Activity, Practices Completed, First Attempt Accuracy`
 
