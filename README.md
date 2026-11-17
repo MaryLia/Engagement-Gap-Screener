@@ -1,10 +1,10 @@
 # Engagement–Performance Gap Screener
 
-A single-file, fully offline web app that helps instructors spot exam scores that are unusually high relative to a student's logged engagement with the course (LMS hours) and the textbook (reading time).
+A single-file, fully offline web app that helps instructors spot exam scores that are unusually high relative to a student's logged engagement with the Blackboard Ultra course (LMS hours) and the VitalSource textbook (reading time).
 
 > **This is a screening aid, not evidence of academic misconduct.** A high exam score with low logged engagement is also exactly what a well-prepared student who studies offline, uses a print textbook, or has prior knowledge of the material looks like. Treat a "Review Priority" flag as a reason to look more closely, never as a conclusion.
 
-**Live version:** https://YOUR-USERNAME.github.io/engagement-gap-screener/
+**Live version:** https://YOUR-USERNAME.github.io/Engagement-Gap-Screener/
 **Or download:** save `index.html` and open it in any modern browser. No installation needed.
 
 ---
