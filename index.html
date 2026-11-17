@@ -1,0 +1,1369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<!-- Privacy: nothing may be loaded from or sent to any network location. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:;">
+<meta name="referrer" content="no-referrer">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Review Priority</title>
+<style>
+  :root {
+    --bg: #ffffff; --panel: #f5f7fa; --border: #c9d1db; --text: #1b1f24; --muted: #4a5260;
+    --accent: #1d4f91; --accent-text: #ffffff; --focus: #ffbf47;
+    --high-bg: #fde2e1; --high-fg: #8a1c13; --high-pt: #c0392b;
+    --mod-bg: #fff0c2; --mod-fg: #5e4100; --mod-pt: #a86500;
+    --none-pt: #5f6f86; --warn-bg: #fff6d6; --warn-border: #b38600; --err-bg: #fde2e1;
+    --ok-fg: #1e6b34;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; color: var(--text); background: var(--bg); }
+  header, main { max-width: 1400px; margin: 0 auto; padding: 0 16px; }
+  header { padding-top: 16px; }
+  h1 { font-size: 1.6rem; margin: 0 0 8px; }
+  h2 { font-size: 1.2rem; margin: 0 0 10px; }
+  h3 { font-size: 1rem; margin: 14px 0 6px; }
+  section { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; margin: 14px 0; }
+  .disclaimer { border-left: 6px solid var(--warn-border); background: var(--warn-bg); padding: 10px 14px; border-radius: 4px; }
+  .muted { color: var(--muted); }
+  .small { font-size: 0.88rem; }
+  button, .btn { font: inherit; padding: 6px 12px; border-radius: 5px; border: 1px solid var(--accent); background: var(--accent); color: var(--accent-text); cursor: pointer; }
+  button.secondary { background: #fff; color: var(--accent); }
+  button.danger { background: #fff; color: #8a1c13; border-color: #8a1c13; }
+  button:disabled { opacity: .55; cursor: not-allowed; }
+  :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+  input[type=number] { width: 5.5em; font: inherit; padding: 3px 5px; }
+  select { font: inherit; padding: 3px 5px; max-width: 100%; }
+  .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  .files { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); gap: 12px; }
+  .drop { border: 2px dashed var(--border); border-radius: 8px; padding: 12px; background: #fff; }
+  .drop.over { border-color: var(--accent); background: #eef4fc; }
+  .drop label { font-weight: 600; display: block; margin-bottom: 6px; }
+  .status { margin-top: 6px; font-size: 0.88rem; min-height: 1.3em; }
+  .status.ok { color: var(--ok-fg); }
+  .status.err { color: #8a1c13; background: var(--err-bg); padding: 6px; border-radius: 4px; }
+  .settings { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(250px, 100%), 1fr)); gap: 10px 18px; }
+  .settings label { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; align-items: center; }
+  input[type=file], input[type=range] { max-width: 100%; min-width: 0; }
+  #diag, #match { overflow-x: auto; }
+  .warn { background: var(--warn-bg); border: 1px solid var(--warn-border); padding: 8px 12px; border-radius: 5px; margin: 8px 0; }
+  .table-wrap { overflow-x: auto; background: #fff; border: 1px solid var(--border); border-radius: 6px; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
+  th, td { padding: 6px 8px; border-bottom: 1px solid #e1e6ec; text-align: left; vertical-align: top; }
+  th { background: #e9eef4; position: sticky; top: 0; }
+  th.ctx, td.ctx { background: #f7f4ee; }
+  th button.sort { background: none; border: none; color: var(--text); font-weight: 700; padding: 0; text-align: left; }
+  th button.sort::after { content: " \2195"; color: var(--muted); }
+  th[aria-sort=ascending] button.sort::after { content: " \25B2"; color: var(--text); }
+  th[aria-sort=descending] button.sort::after { content: " \25BC"; color: var(--text); }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .tier { display: inline-block; padding: 1px 8px; border-radius: 10px; font-weight: 700; white-space: nowrap; border: 1px solid transparent; }
+  .tier.High { background: var(--high-bg); color: var(--high-fg); border-color: var(--high-fg); }
+  .tier.Moderate { background: var(--mod-bg); color: var(--mod-fg); border-color: var(--mod-fg); }
+  .tier.None { color: var(--muted); font-weight: 400; }
+  .tier.NA { color: var(--muted); font-style: italic; font-weight: 400; }
+  .weak { display: block; font-size: 0.8rem; color: var(--ok-fg); font-weight: 600; }
+  .flag { display: inline-block; font-size: 0.78rem; background: #e7ebf0; border-radius: 4px; padding: 0 5px; margin: 1px 2px 1px 0; }
+  .flag.partial { background: #e3dcf5; }
+  .flag.good { background: #d9efdf; }
+  .unknown { color: var(--muted); font-style: italic; }
+  details > summary { cursor: pointer; font-weight: 700; }
+  .chart-wrap { background: #fff; border: 1px solid var(--border); border-radius: 6px; padding: 6px; }
+  svg text { fill: var(--text); font-size: 12px; }
+  #tooltip { position: fixed; z-index: 10; pointer-events: none; background: #1b1f24; color: #fff; padding: 8px 10px; border-radius: 6px; font-size: 0.85rem; max-width: 300px; display: none; line-height: 1.35; }
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 0.85rem; margin: 6px 0; }
+  .two-col { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(380px, 100%), 1fr)); gap: 14px; }
+  code, .formula { font-family: Consolas, "Courier New", monospace; font-size: 0.88rem; }
+  .formula { background: #fff; border: 1px solid var(--border); padding: 8px; border-radius: 4px; white-space: pre-wrap; }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  #printSummary { display: none; }
+  @media print {
+    body.printing > *:not(#printSummary) { display: none !important; }
+    body.printing #printSummary { display: block; }
+    #printSummary table { font-size: 10pt; }
+    #printSummary th { position: static; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Review Priority</h1>
+  <p class="disclaimer" role="note"><strong>Screening aid only.</strong> A "Review Priority" tier means only that an exam score is unusually high <em>relative to logged engagement</em> in this class. It is <strong>not evidence of academic misconduct</strong>. Engagement logs are incomplete: students study offline, share devices, use print books, or simply already know the material. Any follow-up should rely on independent evidence and your institution's procedures.</p>
+  <p class="small muted">Privacy: everything runs inside this browser tab. No data is uploaded, stored, or sent anywhere, and it disappears when you close the tab.</p>
+</header>
+
+<main>
+  <!-- ======================= 1. Files ======================= -->
+  <section aria-labelledby="h-files">
+    <h2 id="h-files">1. Load files</h2>
+    <div class="files">
+      <div class="drop" data-kind="course">
+        <label for="f-course">Course engagement (Blackboard Performance Dashboard)</label>
+        <input type="file" id="f-course" accept=".csv,.tsv,.txt,.xls,text/csv,text/plain">
+        <div class="status" id="s-course" role="status" aria-live="polite">Drop a file here or choose one.</div>
+      </div>
+      <div class="drop" data-kind="textbook">
+        <label for="f-textbook">Textbook engagement (publisher export)</label>
+        <input type="file" id="f-textbook" accept=".csv,.tsv,.txt,.xls,text/csv,text/plain">
+        <div class="status" id="s-textbook" role="status" aria-live="polite">Drop a file here or choose one.</div>
+      </div>
+      <div class="drop" data-kind="exam">
+        <label for="f-exam">Exam (Blackboard Grade Center export)</label>
+        <input type="file" id="f-exam" accept=".csv,.tsv,.txt,.xls,text/csv,text/plain">
+        <div class="status" id="s-exam" role="status" aria-live="polite">Drop a file here or choose one.</div>
+      </div>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <button type="button" id="btn-demo" class="secondary">Load demo data (synthetic)</button>
+      <button type="button" id="btn-clear" class="danger">Clear all data</button>
+    </div>
+  </section>
+
+  <!-- ======================= 2. Settings ======================= -->
+  <section aria-labelledby="h-settings">
+    <h2 id="h-settings">2. Settings</h2>
+    <div class="settings">
+      <label for="in-keywords">Assessment column keywords <input type="text" id="in-keywords" value="exam, test, quiz" size="18" aria-describedby="kw-help" spellcheck="false"></label>
+      <label for="sel-exam">Assessment to analyze <select id="sel-exam" disabled><option>Load an exam file</option></select></label>
+      <label for="in-floor">Minimum exam percent (absolute floor) <input type="number" id="in-floor" min="0" max="200" step="1" value="85"></label>
+      <label for="in-pmin">Minimum exam percentile <input type="number" id="in-pmin" min="0" max="100" step="1" value="75"></label>
+      <label for="in-gap">Minimum gap (Moderate) <input type="number" id="in-gap" min="0" max="100" step="1" value="50"></label>
+      <label for="in-high">Gap for High tier <input type="number" id="in-high" min="0" max="100" step="1" value="70"></label>
+      <label for="in-faa">Practice accuracy that weakens a flag (%) <input type="number" id="in-faa" min="0" max="100" step="1" value="80"></label>
+      <label for="in-weight">Weight: course <output id="out-weight" for="in-weight">50</output>% / textbook <output id="out-weight2">50</output>%
+        <input type="range" id="in-weight" min="0" max="100" step="5" value="50" aria-describedby="weight-help"></label>
+      <label for="in-withinmod">Exam percentile within modality <input type="checkbox" id="in-withinmod"></label>
+      <label for="in-anon">Anonymize view (pseudonyms) <input type="checkbox" id="in-anon"></label>
+    </div>
+    <p id="kw-help" class="small muted">Grade Center score columns count as assessments when their name contains one of these comma-separated words, matched as whole words in any letter case. Plurals count too, so "test" matches "Unit 2 Test" and "Tests", but not "Testing Center". Add words such as "midterm, final" if your course uses them.</p>
+    <p id="weight-help" class="small muted">The weight slider sets how much course hours vs. textbook hours count toward the engagement percentile. Students with unknown textbook time use course hours only.</p>
+  </section>
+
+  <!-- ======================= 3. Diagnostics ======================= -->
+  <section aria-labelledby="h-diag">
+    <h2 id="h-diag">3. Class diagnostics</h2>
+    <div id="diag"><p class="muted">Load an exam file and at least one engagement file.</p></div>
+  </section>
+
+  <!-- ======================= 4. Match review ======================= -->
+  <section aria-labelledby="h-match">
+    <details id="match-details">
+      <summary><h2 id="h-match" style="display:inline">4. Match review (textbook names to roster)</h2> <span id="match-summary" class="small muted"></span></summary>
+      <div id="match"></div>
+    </details>
+  </section>
+
+  <!-- ======================= 5. Results ======================= -->
+  <section aria-labelledby="h-results">
+    <h2 id="h-results">5. Review Priority results</h2>
+    <p class="small muted">Click a column heading to sort. Context columns (shaded) are for display only and are not part of the score.</p>
+    <div class="table-wrap" id="results"><p class="muted" style="padding:8px">No results yet.</p></div>
+  </section>
+
+  <section aria-labelledby="h-scatter">
+    <h2 id="h-scatter">6. Scatter plot: engagement percentile vs. exam percent</h2>
+    <div class="legend" id="legend" aria-hidden="true"></div>
+    <div class="chart-wrap" id="scatter"><p class="muted">No data yet.</p></div>
+    <p class="small muted">Hover over a point or focus it with Tab to see details. Hollow points are students with partial data (textbook time unknown). The dashed line is the minimum exam percent. Every value in the chart is also in the table above.</p>
+  </section>
+
+  <section aria-labelledby="h-unscored">
+    <h2 id="h-unscored">7. Students not scored</h2>
+    <div id="unscored"><p class="muted">None yet.</p></div>
+  </section>
+
+  <section aria-labelledby="h-export">
+    <h2 id="h-export">8. Export</h2>
+    <div class="row">
+      <label for="in-names"><input type="checkbox" id="in-names"> Include real names in the export and printout (otherwise pseudonyms are used)</label>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button type="button" id="btn-export" disabled>Export report (CSV)</button>
+      <button type="button" id="btn-print" class="secondary" disabled>Print summary</button>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-how">
+    <details>
+      <summary><h2 id="h-how" style="display:inline">How this is calculated</h2></summary>
+      <div class="small">
+        <h3>Who is scored</h3>
+        <p>Only students with a numeric score for the selected exam. "Needs Grading", "In Progress", "Exempt", "-", and blank count as <em>no score</em>, and those students are listed in section 7. If a student has a value in more than one modality column, that is a <strong>data conflict</strong>. The student is not scored until you choose which value to use.</p>
+        <h3>Which Grade Center columns are assessments</h3>
+        <p>Any column shaped like <code>[Modality - ]Name [Total Pts: P Score] |id</code> whose <em>Name</em> contains a keyword from Settings (default: exam, test, quiz). The text before the first " - " is read as the modality only if it has no digits and no keyword. "Testing Center - Exam 1" is <em>Exam 1</em> taken at the Testing Center. "Unit 3 - Quiz" and "Midterm Test" are names with modality "Standard". Columns with the same name (ignoring case) are one assessment offered in different modalities. If two of those columns are ever wrongly combined, the students affected appear as data conflicts rather than being scored silently.</p>
+        <h3>Steps</h3>
+        <div class="formula">exam%        = raw score / Total Pts × 100
+courseHrs    = Hours in Course
+textbookHrs  = Total Time(seconds) / 3600   (UNKNOWN if the textbook row is unmatched or unconfirmed, which is not the same as 0)
+
+pctRank(x)   = (average rank of x − 1) / (n − 1) × 100     (ties share their average rank; n = 1 gives 50)
+               computed among the scored students who have a known value for that measure
+
+courseP      = pctRank(courseHrs)
+textbookP    = pctRank(textbookHrs)
+engagementP  = w × courseP + (1 − w) × textbookP          (w = course weight)
+             = courseP alone, or textbookP alone, if the other one is unknown ("partial data")
+examP        = pctRank(exam%)    (across the class, or within modality if that option is on)
+gap          = examP − engagementP                         (range −100 … +100)
+
+Review Priority applies only if ALL of these hold:
+   exam% ≥ floor (85)   AND   examP ≥ 75   AND   gap ≥ 50
+   High      if gap ≥ 70
+   Moderate  if 50 ≤ gap < 70
+   otherwise none</div>
+        <h3>Why ranks?</h3>
+        <p>Engagement times are highly skewed: a few students log very many hours. With 20–60 students, means and z-scores get pulled around by those outliers. Percentile ranks rely only on order, so one extreme value cannot move everyone else.</p>
+        <h3>Diagnostics</h3>
+        <p>Spearman's ρ (the Pearson correlation of ranks) between exam% and each engagement measure. If |ρ| &lt; 0.2, engagement barely predicts scores in this class, so a large gap carries little information.</p>
+        <h3>Context, not scored</h3>
+        <p>Overall Grade, Missed Due Dates, Practices Completed, and First Attempt Accuracy are shown for judgment only. A flagged row is labeled <strong>"weakened by practice data"</strong> when First Attempt Accuracy is at least the setting (default 80%) <em>and</em> Practices Completed is at least the class median. That pattern is evidence of real preparation.</p>
+        <h3>Name matching</h3>
+        <p>Course and exam files are joined on Username, falling back to Student ID. Textbook names are normalized: lowercase, accents removed, punctuation and suffixes (Jr, Sr, II, III, IV) removed, whitespace collapsed. A name containing a comma is read as "Last, First"; otherwise it is read as "First Last". An exact match is tried first in both name orders. If there is none, a Jaro-Winkler fuzzy match ≥ 0.85 is proposed, and it is <strong>not used until you confirm it</strong>.</p>
+      </div>
+    </details>
+  </section>
+</main>
+
+<div id="tooltip" role="tooltip"></div>
+<div id="printSummary"></div>
+
+<script>
+'use strict';
+(function () {
+  /* =====================================================================
+   * Utilities
+   * ===================================================================== */
+  const $ = (id) => document.getElementById(id);
+  // All file-derived text is untrusted; escape before any innerHTML use.
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const fmt = (v, d = 1) => (v == null || !isFinite(v) ? '—' : Number(v).toFixed(d));
+  const median = (arr) => { if (!arr.length) return null; const a = [...arr].sort((x, y) => x - y); const m = a.length >> 1; return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2; };
+
+  /** Parse a number from a cell: strips whitespace, thousands commas, trailing %. Returns null if not numeric. */
+  function parseNum(s) {
+    if (s == null) return null;
+    const t = String(s).trim().replace(/,/g, '').replace(/%$/, '');
+    if (!/^[-+]?(\d+\.?\d*|\.\d+)$/.test(t)) return null;
+    return Number(t);
+  }
+  /** Hours may be decimal ("12.5") or clock-style ("12:30" or "12:30:00"). */
+  function parseHours(s) {
+    // "1,5" (decimal comma, 1–2 digits after it) means 1.5 hours, not 15; "1,500" stays a thousands separator.
+    const dc = String(s || '').trim().match(/^(\d+),(\d{1,2})$/);
+    if (dc) return Number(dc[1] + '.' + dc[2]);
+    const n = parseNum(s);
+    if (n != null) return n;
+    const m = String(s || '').trim().match(/^(\d+):(\d{1,2})(?::(\d{1,2}))?$/);
+    return m ? (+m[1]) + (+m[2]) / 60 + (m[3] ? (+m[3]) / 3600 : 0) : null;
+  }
+  /** Accuracy: "85%" -> 85; a bare value <= 1 is treated as a fraction (0.85 -> 85). */
+  function parseAccuracy(s) {
+    const raw = String(s || '').trim();
+    const n = parseNum(raw);
+    if (n == null) return null;
+    return (!raw.endsWith('%') && n <= 1) ? n * 100 : n;
+  }
+
+  /* =====================================================================
+   * File decoding + hand-written CSV/TSV parser
+   * ===================================================================== */
+
+  /** Decode bytes: honour UTF-16 LE/BE BOMs (Blackboard "Download Grades" uses UTF-16 TSV),
+   *  else UTF-8, falling back to Windows-1252 if UTF-8 decoding produced replacement chars. */
+  function decodeBytes(buf) {
+    const b = new Uint8Array(buf);
+    if (b[0] === 0xFF && b[1] === 0xFE) return new TextDecoder('utf-16le').decode(b.subarray(2));
+    if (b[0] === 0xFE && b[1] === 0xFF) return new TextDecoder('utf-16be').decode(b.subarray(2));
+    let text = new TextDecoder('utf-8').decode(b);
+    if (text.includes('�')) text = new TextDecoder('windows-1252').decode(b);
+    return text;
+  }
+
+  /** Delimiter auto-detect: count commas vs tabs in the header line (outside quotes). */
+  function detectDelimiter(text) {
+    let inQ = false, commas = 0, tabs = 0;
+    for (let i = 0; i < text.length; i++) {
+      const c = text[i];
+      if (c === '"') { inQ = !inQ; continue; }
+      if (inQ) continue;
+      if (c === ',') commas++;
+      else if (c === '\t') tabs++;
+      else if ((c === '\n' || c === '\r') && (commas || tabs)) break;
+    }
+    return tabs > commas ? '\t' : ',';
+  }
+
+  /** RFC-4180-style state machine. Handles quoted fields, "" escapes, embedded delimiters
+   *  and newlines inside quotes, CRLF / LF / CR line endings, and a leading UTF-8 BOM.
+   *  Fully blank rows are dropped. */
+  function parseDelimited(text) {
+    if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+    const d = detectDelimiter(text);
+    const rows = [];
+    let row = [], field = '', inQ = false, i = 0;
+    const n = text.length;
+    while (i < n) {
+      const c = text[i];
+      if (inQ) {
+        if (c === '"') {
+          if (text[i + 1] === '"') { field += '"'; i += 2; continue; }
+          inQ = false; i++; continue;
+        }
+        field += c; i++; continue;
+      }
+      if (c === '"' && field.trim() === '') { field = ''; inQ = true; i++; continue; } // quote opens only at field start
+      if (c === d) { row.push(field); field = ''; i++; continue; }
+      if (c === '\r' || c === '\n') {
+        if (c === '\r' && text[i + 1] === '\n') i++;
+        row.push(field); rows.push(row); row = []; field = ''; i++; continue;
+      }
+      field += c; i++;
+    }
+    if (field !== '' || row.length) { row.push(field); rows.push(row); }
+    return { delimiter: d, rows: rows.filter((r) => r.some((f) => f.trim() !== '')) };
+  }
+
+  /* =====================================================================
+   * File specifications and header validation
+   * ===================================================================== */
+  const SPEC = {
+    course: { label: 'Course engagement', required: ['Last Name', 'First Name', 'Username', 'Student ID', 'Hours in Course'], optional: ['Overall Grade', 'Missed Due Dates'] },
+    textbook: { label: 'Textbook engagement', required: ['Student Name', 'Total Time(seconds)'], optional: ['Practices Completed', 'First Attempt Accuracy'] },
+    exam: { label: 'Exam', required: ['Last Name', 'First Name', 'Username', 'Student ID'], optional: [] },
+  };
+  // Any Grade Center score column: "<label> [Total Pts: <P> Score]" (or "up to <P>"), optional trailing "|<id>".
+  const GC_COL_RE = /^\s*(.+?)\s*\[\s*Total\s+Pts:\s*(?:up\s+to\s+)?([\d.]+)\s+Score\s*\]\s*(?:\|\s*\S*)?\s*$/i;
+  const DEFAULT_KEYWORDS = 'exam, test, quiz';
+
+  /** Whole-word, case-insensitive keyword matcher; plurals allowed ("Exams", "Tests", "Quizzes").
+   *  Whole words keep "test" from matching "Testing Center" or "Contest". */
+  function keywordRegex(text) {
+    const words = String(text || '').split(/[,;]+/).map((w) => w.trim()).filter(Boolean)
+      .map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+'));
+    return words.length ? new RegExp('\\b(?:' + words.join('|') + ')(?:s|es|zes)?\\b', 'i') : null;
+  }
+
+  /** Split "<Modality> - <Assessment name>". The text before the first " - " counts as a modality only
+   *  if it has no digits and no keyword ("Testing Center - Exam 1" → modality "Testing Center";
+   *  "Unit 3 - Quiz" and "Exam 1 - Part A" stay whole names with modality "Standard"). */
+  function splitModality(label, kw) {
+    const parts = label.split(/\s+-\s+/);
+    if (parts.length > 1 && !/\d/.test(parts[0]) && !kw.test(parts[0]))
+      return { modality: parts[0].trim(), name: parts.slice(1).join(' - ').trim() };
+    return { modality: 'Standard', name: label.trim() };
+  }
+
+  /** Find assessment columns: score columns whose assessment name contains a keyword.
+   *  Columns with the same assessment name (ignoring case/spacing) are one assessment in different modalities. */
+  function detectExamCols(headers, keywordText) {
+    const kw = keywordRegex(keywordText);
+    if (!kw) return [];
+    const cols = [];
+    headers.forEach((h, j) => {
+      const m = h.match(GC_COL_RE);
+      if (!m || !(+m[2] > 0)) return;
+      const { modality, name } = splitModality(m[1], kw);
+      if (!kw.test(name)) return;
+      cols.push({ index: j, header: h, modality, name, key: name.toLowerCase().replace(/\s+/g, ' '), total: +m[2] });
+    });
+    return cols;
+  }
+  /** Status text: which columns were taken as assessments, and which score columns were skipped. */
+  function examColsSummary(f) {
+    const used = new Set(f.examCols.map((c) => c.index));
+    const skipped = f.headers.filter((h, j) => GC_COL_RE.test(h) && !used.has(j)).map((h) => h.replace(/\s*\[.*$/, ''));
+    return `, assessment columns: ${f.examCols.map((c) => `${c.name}, ${c.modality} (${c.total} pts)`).join('; ')}` +
+      (skipped.length ? `. Ignored (no keyword): ${skipped.join('; ')}` : '');
+  }
+  const examLabel = (key) => { const c = state.files.exam && state.files.exam.examCols.find((x) => x.key === key); return c ? c.name : String(key || ''); };
+  // Header comparison ignores case and ALL whitespace ("Total Time (seconds)" == "Total Time(seconds)").
+  const normHeader = (h) => String(h).replace(/\s+/g, '').toLowerCase();
+
+  function ingest(kind, text, fileName) {
+    const { rows, delimiter } = parseDelimited(text);
+    if (rows.length < 2) throw new Error(`${SPEC[kind].label} file "${fileName}" has no data rows.`);
+    const headers = rows[0].map((h) => h.trim());
+    const norm = headers.map(normHeader);
+    const idx = {}, missing = [], missingOpt = [];
+    for (const name of SPEC[kind].required) { const j = norm.indexOf(normHeader(name)); j < 0 ? missing.push(name) : (idx[name] = j); }
+    for (const name of SPEC[kind].optional) { const j = norm.indexOf(normHeader(name)); j < 0 ? missingOpt.push(name) : (idx[name] = j); }
+    let examCols = [];
+    if (kind === 'exam') {
+      examCols = detectExamCols(headers, $('in-keywords').value);
+      if (!examCols.length) missing.push(`a score column whose name contains one of the keywords (${$('in-keywords').value || 'none set'}), e.g. "Testing Center - Exam 1 [Total Pts: 200 Score]"`);
+    }
+    if (missing.length) {
+      throw new Error(`${SPEC[kind].label} file "${fileName}" is missing required column(s): ${missing.map((m) => `"${m}"`).join(', ')}. ` +
+        `Columns found: ${headers.slice(0, 14).map((h) => `"${h}"`).join(', ')}${headers.length > 14 ? ', …' : ''}`);
+    }
+    const records = rows.slice(1).map((r) => {
+      const o = { _raw: r.map((v) => (v == null ? '' : String(v).trim())) };
+      for (const k in idx) o[k] = (r[idx[k]] == null ? '' : String(r[idx[k]])).trim();
+      return o;
+    });
+    return { fileName, delimiter, headers, records, examCols, missingOpt };
+  }
+
+  /* =====================================================================
+   * Application state (memory only: no storage APIs are ever used)
+   * ===================================================================== */
+  function freshState() {
+    return {
+      files: { course: null, textbook: null, exam: null },
+      roster: [],          // one entry per exam-file student
+      tb: [],              // parsed textbook rows
+      matchBase: new Map(),// rosterKey -> {tbIdx, kind:'exact'|'fuzzy', conf}
+      decisions: new Map(),// rosterKey -> {type:'confirm'|'reject'|'manual', tbIdx}
+      conflictChoice: new Map(), // `${key}|${examKey}` -> column index
+      examKey: null,      // selected assessment (normalized name)
+      sort: { key: 'priority', dir: -1 },
+      results: [], unscored: [], diag: null,
+    };
+  }
+  let state = freshState();
+
+  function readSettings() {
+    const num = (id, lo, hi, dflt) => { const v = parseFloat($(id).value); return isFinite(v) ? Math.min(hi, Math.max(lo, v)) : dflt; };
+    const w = num('in-weight', 0, 100, 50);
+    $('out-weight').textContent = w; $('out-weight2').textContent = 100 - w;
+    return {
+      floor: num('in-floor', 0, 200, 85), pMin: num('in-pmin', 0, 100, 75),
+      gapMin: num('in-gap', 0, 100, 50), gapHigh: num('in-high', 0, 100, 70),
+      faaMin: num('in-faa', 0, 100, 80), wCourse: w / 100,
+      withinModality: $('in-withinmod').checked, anonymize: $('in-anon').checked,
+    };
+  }
+
+  /* =====================================================================
+   * Name normalization and fuzzy matching
+   * ===================================================================== */
+  // Suffixes are removed when they follow a space or comma and end the name or precede a comma.
+  const SUFFIX_RE = /(?:,\s*|\s+)(?:jr|sr|ii|iii|iv)\.?(?=\s*(?:,|$))/gi;
+
+  /** lowercase → strip accents → strip suffixes → drop punctuation (commas kept for format detection) → collapse spaces */
+  function normName(s) {
+    return String(s || '')
+      .normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .toLowerCase()
+      .replace(SUFFIX_RE, '')
+      .replace(/['’`]/g, '')            // O'Brien -> obrien
+      .replace(/[^a-z0-9,]+/g, ' ')     // hyphens, periods, etc. become spaces
+      .replace(/\s*,\s*/g, ',')
+      .replace(/\s+/g, ' ').trim();
+  }
+  const squash = (s) => s.replace(/,/g, ' ').replace(/\s+/g, ' ').trim();
+  const sortTokens = (s) => s.split(' ').sort().join(' ');
+
+  /** Per-row format detection for the textbook "Student Name" column. */
+  function parseTextbookName(raw) {
+    const n = normName(raw);
+    const comma = n.indexOf(',');
+    if (comma > 0 && comma < n.length - 1) {
+      const last = n.slice(0, comma), first = n.slice(comma + 1);
+      return { format: 'Last, First', canon: squash(first + ' ' + last) };
+    }
+    return { format: 'First Last', canon: squash(n) };
+  }
+
+  /** Jaro similarity (0..1). */
+  function jaro(a, b) {
+    if (a === b) return 1;
+    const la = a.length, lb = b.length;
+    if (!la || !lb) return 0;
+    const md = Math.max(0, Math.floor(Math.max(la, lb) / 2) - 1);
+    const am = new Array(la).fill(false), bm = new Array(lb).fill(false);
+    let m = 0;
+    for (let i = 0; i < la; i++) {
+      for (let j = Math.max(0, i - md); j < Math.min(i + md + 1, lb); j++) {
+        if (!bm[j] && a[i] === b[j]) { am[i] = bm[j] = true; m++; break; }
+      }
+    }
+    if (!m) return 0;
+    let t = 0, k = 0;
+    for (let i = 0; i < la; i++) {
+      if (!am[i]) continue;
+      while (!bm[k]) k++;
+      if (a[i] !== b[k]) t++;
+      k++;
+    }
+    return (m / la + m / lb + (m - t / 2) / m) / 3;
+  }
+  /** Jaro-Winkler: boosts strings sharing a prefix (up to 4 chars, p = 0.1). */
+  function jaroWinkler(a, b) {
+    const j = jaro(a, b);
+    let p = 0;
+    while (p < 4 && p < a.length && p < b.length && a[p] === b[p]) p++;
+    return j + p * 0.1 * (1 - j);
+  }
+  /** Best similarity over name orders and token-sorted forms (robust to First/Last swaps). */
+  function nameSimilarity(tbCanon, r) {
+    return Math.max(
+      jaroWinkler(tbCanon, r.canonFL),
+      jaroWinkler(tbCanon, r.canonLF),
+      jaroWinkler(sortTokens(tbCanon), sortTokens(r.canonFL))
+    );
+  }
+  const FUZZY_MIN = 0.85;
+
+  /** Build baseline textbook↔roster links.
+   *  1) Exact: textbook canonical "first last" equals a roster "first last" (or "last first", for
+   *     un-commaed "Last First" rows). Only unique one-to-one hits count; ambiguous ones go to review.
+   *  2) Fuzzy: remaining pairs scored by Jaro-Winkler; pairs >= FUZZY_MIN assigned greedily, best first. */
+  function buildMatches() {
+    const base = new Map();
+    const R = state.roster, T = state.tb;
+    if (!R.length || !T.length) { state.matchBase = base; return; }
+    const byFL = new Map(), byLF = new Map();
+    for (const r of R) {
+      if (!byFL.has(r.canonFL)) byFL.set(r.canonFL, []); byFL.get(r.canonFL).push(r);
+      if (!byLF.has(r.canonLF)) byLF.set(r.canonLF, []); byLF.get(r.canonLF).push(r);
+    }
+    const proposals = new Map(); // rosterKey -> [tbIdx...]
+    const tbHit = new Map();     // tbIdx -> roster entries
+    for (const t of T) {
+      if (!t.canon) continue;
+      const hits = byFL.get(t.canon) || byLF.get(t.canon) || [];
+      tbHit.set(t.idx, hits);
+      if (hits.length === 1) {
+        const k = hits[0].key;
+        if (!proposals.has(k)) proposals.set(k, []);
+        proposals.get(k).push(t.idx);
+      }
+    }
+    const usedTb = new Set();
+    for (const [k, list] of proposals) {
+      if (list.length === 1 && tbHit.get(list[0]).length === 1) { base.set(k, { tbIdx: list[0], kind: 'exact', conf: 1 }); usedTb.add(list[0]); }
+    }
+    // Fuzzy pass over everything not exactly matched.
+    const pairs = [];
+    for (const r of R) {
+      if (base.has(r.key)) continue;
+      for (const t of T) {
+        if (usedTb.has(t.idx) || !t.canon) continue;
+        const s = nameSimilarity(t.canon, r);
+        if (s >= FUZZY_MIN) pairs.push({ k: r.key, tbIdx: t.idx, s });
+      }
+    }
+    pairs.sort((a, b) => b.s - a.s);
+    for (const p of pairs) {
+      if (base.has(p.k) || usedTb.has(p.tbIdx)) continue;
+      base.set(p.k, { tbIdx: p.tbIdx, kind: 'fuzzy', conf: p.s }); usedTb.add(p.tbIdx);
+    }
+    state.matchBase = base;
+  }
+
+  /** Effective links after instructor decisions. Status: exact | confirmed | pending | manual. */
+  function effectiveLinks() {
+    const links = new Map();
+    for (const r of state.roster) {
+      const b = state.matchBase.get(r.key), d = state.decisions.get(r.key);
+      if (d && d.type === 'manual') { links.set(r.key, { tbIdx: d.tbIdx, status: 'manual', conf: null }); continue; }
+      if (!b || (d && d.type === 'reject')) continue;
+      if (b.kind === 'exact') links.set(r.key, { tbIdx: b.tbIdx, status: 'exact', conf: 1 });
+      else links.set(r.key, { tbIdx: b.tbIdx, status: d && d.type === 'confirm' ? 'confirmed' : 'pending', conf: b.conf });
+    }
+    return links;
+  }
+
+  /* =====================================================================
+   * Roster construction and joins
+   * ===================================================================== */
+  function buildRoster() {
+    const exam = state.files.exam, course = state.files.course;
+    state.roster = [];
+    if (!exam) return;
+    const byUser = new Map(), byId = new Map();
+    if (course) for (const c of course.records) {
+      if (c['Username']) byUser.set(c['Username'].toLowerCase(), c);
+      if (c['Student ID']) byId.set(c['Student ID'], c);
+    }
+    const seen = new Map();
+    exam.records.forEach((r, i) => {
+      const user = (r['Username'] || '').toLowerCase(), sid = r['Student ID'] || '';
+      let c = null, joinedBy = null;
+      if (course) {
+        if (user && byUser.has(user)) { c = byUser.get(user); joinedBy = 'Username'; }
+        else if (sid && byId.has(sid)) { c = byId.get(sid); joinedBy = 'Student ID'; }
+      }
+      const key = user ? 'u:' + user : sid ? 'id:' + sid : 'row:' + i;
+      const first = r['First Name'] || (c && c['First Name']) || '';
+      const last = r['Last Name'] || (c && c['Last Name']) || '';
+      const nf = squash(normName(first)), nl = squash(normName(last));
+      const entry = {
+        key, first, last, user: r['Username'] || (c && c['Username']) || '', sid,
+        examRaw: r._raw, course: c, joinedBy,
+        courseHours: c ? parseHours(c['Hours in Course']) : null,
+        canonFL: squash(nf + ' ' + nl), canonLF: squash(nl + ' ' + nf),
+        dup: false,
+      };
+      if (seen.has(key)) { entry.dup = true; seen.get(key).dup = true; entry.key = key + '#' + i; }
+      else seen.set(key, entry);
+      state.roster.push(entry);
+    });
+    // Stable pseudonyms: order by username/ID so the same roster always yields the same codes.
+    [...state.roster].sort((a, b) => a.key.localeCompare(b.key)).forEach((r, i) => { r.pseudo = 'S-' + String(i + 1).padStart(3, '0'); });
+    const examKeys = new Set(state.roster.map((r) => r.course).filter(Boolean));
+    state.courseOnly = course ? course.records.filter((c) => !examKeys.has(c)).length : 0;
+  }
+
+  function buildTextbook() {
+    const f = state.files.textbook;
+    state.tb = f ? f.records.map((r, idx) => {
+      const p = parseTextbookName(r['Student Name']);
+      return {
+        idx, raw: r['Student Name'], format: p.format, canon: p.canon,
+        seconds: parseNum(r['Total Time(seconds)']),
+        practices: parseNum(r['Practices Completed']),
+        faa: parseAccuracy(r['First Attempt Accuracy']),
+      };
+    }) : [];
+  }
+
+  /* =====================================================================
+   * Exam column handling
+   * ===================================================================== */
+  const isBlank = (v) => v === '' || v === '-' || v === '--';
+
+  /** Combine the modality columns for exam N into one score, or report why that is impossible. */
+  function examStatus(s, N) {
+    const cols = state.files.exam.examCols.filter((c) => c.key === N);
+    const vals = cols.map((c) => ({ col: c, raw: (s.examRaw[c.index] || '').trim() }));
+    const populated = vals.filter((v) => !isBlank(v.raw));
+    if (populated.length > 1) {
+      const chosen = state.conflictChoice.get(s.key + '|' + N);
+      const v = populated.find((p) => p.col.index === chosen);
+      if (!v) return { state: 'conflict', populated };
+      return fromValue(v, true, populated);
+    }
+    if (!populated.length) return { state: 'none', reason: vals.some((v) => v.raw === '-' || v.raw === '--') ? 'No attempt ("-")' : 'Blank' };
+    return fromValue(populated[0], false, populated);
+  }
+  function fromValue(v, resolved, populated) {
+    const n = parseNum(v.raw);
+    if (n == null) return { state: 'nonnumeric', reason: v.raw, modality: v.col.modality, populated, resolved };
+    return { state: 'scored', pct: (n / v.col.total) * 100, raw: n, total: v.col.total, modality: v.col.modality, resolved, populated };
+  }
+
+  /* =====================================================================
+   * Scoring (rank-based)
+   * ===================================================================== */
+
+  /** Within-group percentile ranks, 0..100. Ties receive the average of the ranks they span.
+   *  pct = (avgRank − 1) / (n − 1) × 100;  n = 1 → 50. */
+  function percentileRanks(values) {
+    const n = values.length;
+    if (n === 0) return [];
+    if (n === 1) return [50];
+    const ranks = averageRanks(values);
+    return ranks.map((r) => ((r - 1) / (n - 1)) * 100);
+  }
+  /** 1-based average ranks (ties share the mean of their positions). */
+  function averageRanks(values) {
+    const order = values.map((v, i) => [v, i]).sort((a, b) => a[0] - b[0]);
+    const ranks = new Array(values.length);
+    for (let i = 0; i < order.length;) {
+      let j = i;
+      while (j + 1 < order.length && order[j + 1][0] === order[i][0]) j++;
+      const avg = (i + j) / 2 + 1;
+      for (let k = i; k <= j; k++) ranks[order[k][1]] = avg;
+      i = j + 1;
+    }
+    return ranks;
+  }
+  /** Spearman's rho = Pearson correlation of average ranks. Null if n < 3 or no variance. */
+  function spearman(xs, ys) {
+    const n = xs.length;
+    if (n < 3) return null;
+    const rx = averageRanks(xs), ry = averageRanks(ys);
+    const mx = rx.reduce((a, b) => a + b, 0) / n, my = ry.reduce((a, b) => a + b, 0) / n;
+    let sxy = 0, sxx = 0, syy = 0;
+    for (let i = 0; i < n; i++) { const dx = rx[i] - mx, dy = ry[i] - my; sxy += dx * dy; sxx += dx * dx; syy += dy * dy; }
+    return sxx && syy ? sxy / Math.sqrt(sxx * syy) : null;
+  }
+  /** Assign percentile ranks for `get(item)` among items where it is non-null, into item[field]. */
+  function assignPct(items, get, field) {
+    const known = items.filter((it) => get(it) != null);
+    const p = percentileRanks(known.map(get));
+    known.forEach((it, i) => { it[field] = p[i]; });
+  }
+
+  function compute() {
+    const st = readSettings();
+    state.results = []; state.unscored = []; state.diag = null;
+    if (!state.files.exam || state.examKey == null) return st;
+    const links = effectiveLinks();
+    const tbMedianPractices = median(state.tb.map((t) => t.practices).filter((v) => v != null));
+
+    for (const s of state.roster) {
+      const es = examStatus(s, state.examKey);
+      // ---- textbook status: matched (known time), matched-but-blank, pending fuzzy, or unmatched
+      const link = links.get(s.key);
+      const t = link ? state.tb[link.tbIdx] : null;
+      let tbStatus = 'unmatched', tbHours = null;
+      if (!state.files.textbook) tbStatus = 'nofile';
+      else if (link && link.status === 'pending') tbStatus = 'pending';
+      else if (t) { tbStatus = t.seconds == null ? 'blank' : 'matched'; tbHours = t.seconds == null ? null : t.seconds / 3600; }
+      const usable = t && link.status !== 'pending';
+      const row = {
+        s, es, link, tbStatus, tbHours,
+        courseHours: s.courseHours,
+        practices: usable ? t.practices : null, faa: usable ? t.faa : null,
+        overall: s.course ? s.course['Overall Grade'] : '', missed: s.course ? s.course['Missed Due Dates'] : '',
+        tbMedianPractices,
+      };
+      if (es.state === 'scored') { row.examPct = es.pct; row.modality = es.modality; state.results.push(row); }
+      else state.unscored.push(row);
+    }
+
+    const R = state.results;
+    // Steps 1–2: engagement component percentiles, among scored students with known values.
+    assignPct(R, (r) => r.courseHours, 'courseP');
+    assignPct(R, (r) => r.tbHours, 'tbP');
+    for (const r of R) {
+      const c = r.courseP, t = r.tbP;
+      if (c != null && t != null) r.engP = st.wCourse * c + (1 - st.wCourse) * t;
+      else r.engP = c != null ? c : t != null ? t : null;
+      r.partial = (c == null) !== (t == null);
+    }
+    // Step 3: exam percentile, whole class or within modality.
+    if (st.withinModality) {
+      const groups = new Map();
+      for (const r of R) { if (!groups.has(r.modality)) groups.set(r.modality, []); groups.get(r.modality).push(r); }
+      for (const g of groups.values()) { assignPct(g, (r) => r.examPct, 'examP'); g.forEach((r) => { r.groupN = g.length; }); }
+    } else assignPct(R, (r) => r.examPct, 'examP');
+
+    // Steps 4–5: gap and tier.
+    for (const r of R) {
+      r.gap = r.engP == null ? null : r.examP - r.engP;
+      if (r.engP == null) r.tier = 'NA';
+      else if (r.examPct >= st.floor && r.examP >= st.pMin && r.gap >= st.gapMin) r.tier = r.gap >= st.gapHigh ? 'High' : 'Moderate';
+      else r.tier = 'None';
+      // Context: strong practice accuracy + at-least-median practice volume weakens a flag (display only).
+      r.weakened = (r.tier === 'High' || r.tier === 'Moderate') && r.faa != null && r.faa >= st.faaMin &&
+        r.practices != null && tbMedianPractices != null && r.practices >= tbMedianPractices;
+      r.flags = rowFlags(r, st);
+    }
+
+    // Step 6: diagnostics.
+    const pair = (get) => { const k = R.filter((r) => get(r) != null); return { rho: spearman(k.map((r) => r.examPct), k.map(get)), n: k.length }; };
+    state.diag = {
+      course: pair((r) => r.courseHours), textbook: pair((r) => r.tbHours), engagement: pair((r) => r.engP),
+      nScored: R.length, nUnscored: state.unscored.length, nPartial: R.filter((r) => r.partial).length,
+      nNoEng: R.filter((r) => r.engP == null).length,
+      nPending: [...links.values()].filter((l) => l.status === 'pending').length,
+    };
+    return st;
+  }
+
+  /** Short, text-based data-quality flags for a scored row. */
+  function rowFlags(r, st) {
+    const f = [];
+    if (r.tbStatus === 'unmatched') f.push(['partial', 'Partial data: textbook unmatched']);
+    if (r.tbStatus === 'pending') f.push(['partial', 'Partial data: textbook match unconfirmed']);
+    if (r.tbStatus === 'blank') f.push(['partial', 'Partial data: textbook time blank']);
+    if (r.tbStatus === 'nofile') f.push(['partial', 'No textbook file']);
+    if (r.tbStatus === 'matched' && r.tbHours === 0) f.push(['', 'Matched, 0 textbook seconds logged']);
+    if (r.courseHours == null) f.push(['partial', r.s.course ? 'Course hours not numeric' : 'Not in course file']);
+    if (r.s.joinedBy === 'Student ID') f.push(['', 'Joined by Student ID']);
+    if (r.link && r.link.status === 'confirmed') f.push(['', 'Fuzzy match (confirmed)']);
+    if (r.link && r.link.status === 'manual') f.push(['', 'Manual match']);
+    if (r.es.resolved) f.push(['', `Conflict resolved by instructor (used ${r.es.modality})`]);
+    if (r.examPct > 100) f.push(['', 'Score above 100%']);
+    if (r.s.dup) f.push(['', 'Duplicate roster ID']);
+    if (st.withinModality && r.groupN < 5) f.push(['', `Small modality group (n=${r.groupN})`]);
+    if (r.weakened) f.push(['good', `Practice accuracy ${fmt(r.faa, 0)}% over ${r.practices} practices supports the score`]);
+    return f;
+  }
+
+  /* =====================================================================
+   * Rendering
+   * ===================================================================== */
+  const displayName = (s, anon) => anon ? s.pseudo : `${s.last}, ${s.first} (${s.pseudo})`;
+  const TIER_RANK = { High: 3, Moderate: 2, None: 1, NA: 0 };
+  const tierText = (t) => t === 'NA' ? 'n/a (no engagement data)' : t === 'None' ? 'None' : t;
+  function tierHtml(r) {
+    const icon = r.tier === 'High' ? '▲▲ ' : r.tier === 'Moderate' ? '▲ ' : '';
+    return `<span class="tier ${r.tier}">${icon}${esc(tierText(r.tier))}</span>` + (r.weakened ? '<span class="weak">✓ weakened by practice data</span>' : '');
+  }
+  function tbHoursHtml(r) {
+    if (r.tbStatus === 'matched') return fmt(r.tbHours, 2);
+    const label = { unmatched: 'unmatched', pending: 'unconfirmed', blank: 'blank', nofile: 'no file' }[r.tbStatus];
+    return `<span class="unknown">${label}</span>`;
+  }
+
+  const COLS = [
+    { key: 'name', label: 'Student', sort: (r, st) => displayName(r.s, st.anonymize).toLowerCase(), html: (r, st) => esc(displayName(r.s, st.anonymize)) },
+    { key: 'examPct', label: 'Exam %', num: true, sort: (r) => r.examPct, html: (r) => fmt(r.examPct) },
+    { key: 'modality', label: 'Modality', sort: (r) => r.modality, html: (r) => esc(r.modality) },
+    { key: 'courseHours', label: 'Course hrs', num: true, sort: (r) => r.courseHours, html: (r) => r.courseHours == null ? '<span class="unknown">unknown</span>' : fmt(r.courseHours, 1) },
+    { key: 'tbHours', label: 'Textbook hrs', num: true, sort: (r) => r.tbHours, html: tbHoursHtml },
+    { key: 'engP', label: 'Engagement pctl', num: true, sort: (r) => r.engP, html: (r) => fmt(r.engP, 0) },
+    { key: 'examP', label: 'Exam pctl', num: true, sort: (r) => r.examP, html: (r) => fmt(r.examP, 0) },
+    { key: 'gap', label: 'Gap', num: true, sort: (r) => r.gap, html: (r) => { if (r.gap == null) return '—'; const g = Math.round(r.gap) || 0; return (g > 0 ? '+' : '') + g; } },
+    { key: 'priority', label: 'Review Priority', sort: (r) => TIER_RANK[r.tier] * 1000 + (r.gap == null ? -200 : r.gap), html: tierHtml },
+    { key: 'flags', label: 'Data flags', html: (r) => r.flags.map(([c, t]) => `<span class="flag ${c}">${esc(t)}</span>`).join(' ') || '<span class="muted">—</span>' },
+    { key: 'overall', ctx: true, label: 'Overall Grade', sort: (r) => { const n = parseNum(r.overall); return n == null ? r.overall || null : n; }, html: (r) => esc(r.overall || '—') },
+    { key: 'missed', ctx: true, label: 'Missed Due Dates', num: true, sort: (r) => parseNum(r.missed), html: (r) => esc(r.missed || '—') },
+    { key: 'practices', ctx: true, label: 'Practices Completed', num: true, sort: (r) => r.practices, html: (r) => r.practices == null ? '—' : esc(r.practices) },
+    { key: 'faa', ctx: true, label: 'First Attempt Accuracy', num: true, sort: (r) => r.faa, html: (r) => r.faa == null ? '—' : fmt(r.faa, 0) + '%' },
+  ];
+
+  function sortedResults(st) {
+    const col = COLS.find((c) => c.key === state.sort.key) || COLS[8];
+    const dir = state.sort.dir;
+    return [...state.results].sort((a, b) => {
+      const va = col.sort(a, st), vb = col.sort(b, st);
+      if (va == null && vb == null) return 0;
+      if (va == null) return 1;           // unknowns always last
+      if (vb == null) return -1;
+      if (typeof va === 'string' || typeof vb === 'string') return String(va).localeCompare(String(vb)) * dir;
+      return (va - vb) * dir;
+    });
+  }
+
+  function renderTable(st) {
+    const el = $('results');
+    if (!state.results.length) { el.innerHTML = '<p class="muted" style="padding:8px">No scored students yet.</p>'; return; }
+    const nMain = COLS.filter((c) => !c.ctx).length, nCtx = COLS.length - nMain;
+    let h = `<table><caption class="sr-only">Review Priority results for ${esc(examLabel(state.examKey))}</caption><thead>
+      <tr><th colspan="${nMain}" scope="colgroup">Scored</th><th colspan="${nCtx}" scope="colgroup" class="ctx">Context (display only, not scored)</th></tr><tr>`;
+    for (const c of COLS) {
+      const aria = state.sort.key === c.key ? ` aria-sort="${state.sort.dir > 0 ? 'ascending' : 'descending'}"` : '';
+      h += `<th scope="col" class="${c.ctx ? 'ctx' : ''}"${c.sort ? aria : ''}>` +
+        (c.sort ? `<button type="button" class="sort" data-sort="${c.key}">${esc(c.label)}</button>` : esc(c.label)) + '</th>';
+    }
+    h += '</tr></thead><tbody>';
+    for (const r of sortedResults(st)) {
+      h += '<tr>' + COLS.map((c, i) => {
+        const cls = [c.num ? 'num' : '', c.ctx ? 'ctx' : ''].join(' ').trim();
+        return i === 0 ? `<th scope="row" style="font-weight:600;background:none;position:static">${c.html(r, st)}</th>` : `<td class="${cls}">${c.html(r, st)}</td>`;
+      }).join('') + '</tr>';
+    }
+    el.innerHTML = h + '</tbody></table>';
+  }
+
+  // ---- Scatter plot (inline SVG, no libraries) ----
+  const SHAPES = ['circle', 'square', 'triangle', 'diamond'];
+  function shapePath(kind, x, y, r) {
+    switch (kind) {
+      case 'square': return `M${x - r},${y - r}h${2 * r}v${2 * r}h${-2 * r}z`;
+      case 'triangle': return `M${x},${y - r * 1.2}L${x + r * 1.1},${y + r * 0.9}L${x - r * 1.1},${y + r * 0.9}z`;
+      case 'diamond': return `M${x},${y - r * 1.3}L${x + r * 1.3},${y}L${x},${y + r * 1.3}L${x - r * 1.3},${y}z`;
+      default: return `M${x - r},${y}a${r},${r} 0 1,0 ${2 * r},0a${r},${r} 0 1,0 ${-2 * r},0`;
+    }
+  }
+  const tierColor = (t) => t === 'High' ? 'var(--high-pt)' : t === 'Moderate' ? 'var(--mod-pt)' : 'var(--none-pt)';
+
+  function renderScatter(st) {
+    const pts = state.results.filter((r) => r.engP != null);
+    const modalities = [...new Set(state.results.map((r) => r.modality))].sort();
+    const shapeOf = (m) => SHAPES[modalities.indexOf(m) % SHAPES.length];
+    const leg = $('legend');
+    if (!pts.length) { $('scatter').innerHTML = '<p class="muted">No data yet.</p>'; leg.innerHTML = ''; return; }
+    const sw = (kind, color, hollow) => `<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="${shapePath(kind, 8, 8, 5)}" fill="${hollow ? '#fff' : color}" stroke="${color}" stroke-width="2"/></svg>`;
+    leg.innerHTML = modalities.map((m) => `<span>${sw(shapeOf(m), 'var(--none-pt)')} ${esc(m)}</span>`).join('') +
+      `<span>${sw('circle', 'var(--high-pt)')} High</span><span>${sw('circle', 'var(--mod-pt)')} Moderate</span><span>${sw('circle', 'var(--none-pt)')} None</span><span>${sw('circle', 'var(--none-pt)', true)} Partial data</span>`;
+
+    const W = 760, H = 430, m = { l: 58, r: 18, t: 18, b: 52 };
+    const ys = pts.map((r) => r.examPct);
+    const yMin = Math.min(50, Math.floor(Math.min(...ys) / 10) * 10), yMax = Math.max(100, Math.ceil(Math.max(...ys) / 10) * 10);
+    const X = (v) => m.l + (v / 100) * (W - m.l - m.r);
+    const Y = (v) => H - m.b - ((v - yMin) / (yMax - yMin)) * (H - m.t - m.b);
+    let g = '';
+    for (let v = 0; v <= 100; v += 25) g += `<line x1="${X(v)}" x2="${X(v)}" y1="${m.t}" y2="${H - m.b}" stroke="#e1e6ec"/><text x="${X(v)}" y="${H - m.b + 18}" text-anchor="middle">${v}</text>`;
+    for (let v = yMin; v <= yMax; v += 10) g += `<line x1="${m.l}" x2="${W - m.r}" y1="${Y(v)}" y2="${Y(v)}" stroke="#e1e6ec"/><text x="${m.l - 8}" y="${Y(v) + 4}" text-anchor="end">${v}%</text>`;
+    if (st.floor >= yMin && st.floor <= yMax) g += `<line x1="${m.l}" x2="${W - m.r}" y1="${Y(st.floor)}" y2="${Y(st.floor)}" stroke="#8a1c13" stroke-dasharray="6 4"/><text x="${W - m.r - 4}" y="${Y(st.floor) - 5}" text-anchor="end" style="fill:#8a1c13">exam floor ${st.floor}%</text>`;
+    g += `<text x="${(m.l + W - m.r) / 2}" y="${H - 10}" text-anchor="middle" style="font-weight:600">Engagement percentile (low → high)</text>`;
+    g += `<text transform="translate(16 ${(m.t + H - m.b) / 2}) rotate(-90)" text-anchor="middle" style="font-weight:600">Exam percent</text>`;
+    // Flagged points drawn last so they sit on top.
+    const order = pts.map((r, i) => i).sort((a, b) => TIER_RANK[pts[a].tier] - TIER_RANK[pts[b].tier]);
+    for (const i of order) {
+      const r = pts[i], col = tierColor(r.tier), flagged = r.tier === 'High' || r.tier === 'Moderate';
+      const label = `${displayName(r.s, st.anonymize)}: exam ${fmt(r.examPct)}%, engagement percentile ${fmt(r.engP, 0)}, gap ${fmt(r.gap, 0)}, priority ${tierText(r.tier)}`;
+      g += `<path tabindex="0" role="img" aria-label="${esc(label)}" data-i="${state.results.indexOf(r)}" d="${shapePath(shapeOf(r.modality), X(r.engP), Y(r.examPct), flagged ? 7 : 5.5)}" fill="${r.partial ? '#fff' : col}" stroke="${col}" stroke-width="${flagged ? 2.5 : 1.5}" fill-opacity="${r.partial ? 1 : 0.85}" style="cursor:pointer"/>`;
+    }
+    const nOff = state.results.length - pts.length;
+    $('scatter').innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="group" aria-label="Scatter plot of ${pts.length} students">${g}</svg>` +
+      (nOff ? `<p class="small muted">${nOff} scored student(s) with no engagement data are not plotted.</p>` : '');
+  }
+
+  function showTip(el, clientX, clientY) {
+    const r = state.results[+el.getAttribute('data-i')];
+    if (!r) return;
+    const st = readSettings();
+    const tip = $('tooltip');
+    tip.innerHTML = `<strong>${esc(displayName(r.s, st.anonymize))}</strong><br>Exam ${fmt(r.examPct)}% (${esc(r.modality)}), exam pctl ${fmt(r.examP, 0)}<br>` +
+      `Course ${r.courseHours == null ? 'unknown' : fmt(r.courseHours, 1) + ' h'} · Textbook ${r.tbStatus === 'matched' ? fmt(r.tbHours, 2) + ' h' : esc(r.tbStatus)}<br>` +
+      `Engagement pctl ${fmt(r.engP, 0)} · Gap ${fmt(r.gap, 0)}<br>Priority: <strong>${esc(tierText(r.tier))}</strong>${r.weakened ? ' (weakened by practice data)' : ''}` +
+      (r.flags.length ? `<br><span style="opacity:.85">${r.flags.map((f) => esc(f[1])).join('; ')}</span>` : '');
+    tip.style.display = 'block';
+    if (clientX == null) { const b = el.getBoundingClientRect(); clientX = b.right; clientY = b.top; }
+    const w = tip.offsetWidth, hgt = tip.offsetHeight;
+    tip.style.left = Math.min(window.innerWidth - w - 8, clientX + 12) + 'px';
+    tip.style.top = Math.max(8, Math.min(window.innerHeight - hgt - 8, clientY + 12)) + 'px';
+  }
+  const hideTip = () => { $('tooltip').style.display = 'none'; };
+
+  // ---- Diagnostics ----
+  function renderDiag(st) {
+    const d = state.diag, el = $('diag');
+    if (!d) { el.innerHTML = '<p class="muted">Load an exam file and at least one engagement file.</p>'; return; }
+    const rhoCell = (x) => x.rho == null ? '<span class="unknown">n/a (n &lt; 3 or no variation)</span>' : fmt(x.rho, 2) + (Math.abs(x.rho) < 0.2 ? ' <strong>(weak)</strong>' : '');
+    let h = `<p>Scored: <strong>${d.nScored}</strong> · Not scored: <strong>${d.nUnscored}</strong> · Partial data: <strong>${d.nPartial}</strong> · ` +
+      `No engagement data: <strong>${d.nNoEng}</strong> · Unconfirmed fuzzy matches: <strong>${d.nPending}</strong>` +
+      (state.courseOnly ? ` · Course-file students not in exam file: <strong>${state.courseOnly}</strong>` : '') + '</p>';
+    h += `<table style="max-width:640px;background:#fff"><caption class="sr-only">Spearman correlations</caption><thead><tr><th scope="col">Exam % vs.</th><th scope="col">Spearman ρ</th><th scope="col">n</th></tr></thead><tbody>
+      <tr><th scope="row">Course hours</th><td>${rhoCell(d.course)}</td><td>${d.course.n}</td></tr>
+      <tr><th scope="row">Textbook hours</th><td>${rhoCell(d.textbook)}</td><td>${d.textbook.n}</td></tr>
+      <tr><th scope="row">Combined engagement percentile</th><td>${rhoCell(d.engagement)}</td><td>${d.engagement.n}</td></tr></tbody></table>`;
+    const weak = [['course hours', d.course], ['textbook hours', d.textbook]].filter(([, x]) => x.rho != null && Math.abs(x.rho) < 0.2).map(([n]) => n);
+    if (d.engagement.rho == null || Math.abs(d.engagement.rho) < 0.2)
+      h += `<div class="warn" role="alert"><strong>Warning:</strong> engagement weakly predicts exam scores in this class (combined |ρ| ${d.engagement.rho == null ? 'unavailable' : '= ' + fmt(Math.abs(d.engagement.rho), 2)} &lt; 0.2). Gaps carry little information. Treat every tier with extra caution.</div>`;
+    if (weak.length) h += `<div class="warn">Weak relationship (|ρ| &lt; 0.2) between exam % and ${weak.join(' and ')}.</div>`;
+    if (d.engagement.rho != null && d.engagement.rho <= -0.2)
+      h += `<div class="warn" role="alert"><strong>Warning:</strong> engagement is <em>negatively</em> related to exam scores in this class (ρ = ${fmt(d.engagement.rho, 2)}). The premise of this screen does not hold here, so the tiers are not meaningful.</div>`;
+    if (d.nScored && d.nScored < 15) h += `<div class="warn">Only ${d.nScored} scored students. Percentiles move in large steps at this size.</div>`;
+    if (d.nPending) h += `<div class="warn">${d.nPending} fuzzy textbook match(es) await confirmation in Match review. Until confirmed, those students are scored on course hours only.</div>`;
+    const warnOpt = ['course', 'textbook'].filter((k) => state.files[k] && state.files[k].missingOpt.length)
+      .map((k) => `${SPEC[k].label}: ${state.files[k].missingOpt.join(', ')}`);
+    if (warnOpt.length) h += `<p class="small muted">Optional context columns not found (shown as —): ${esc(warnOpt.join('; '))}.</p>`;
+    el.innerHTML = h;
+  }
+
+  // ---- Match review ----
+  function renderMatch(st) {
+    const el = $('match'), sum = $('match-summary');
+    if (!state.roster.length || !state.tb.length) { el.innerHTML = '<p class="muted">Load the exam and textbook files to review matches.</p>'; sum.textContent = ''; return; }
+    const links = effectiveLinks();
+    const usedTb = new Set([...links.values()].map((l) => l.tbIdx));
+    const exact = [], fuzzy = [], manual = [], unmatchedR = [];
+    for (const r of state.roster) {
+      const l = links.get(r.key), b = state.matchBase.get(r.key);
+      if (l && l.status === 'exact') exact.push([r, l]);
+      else if (l && (l.status === 'pending' || l.status === 'confirmed')) fuzzy.push([r, l]);
+      else if (l && l.status === 'manual') manual.push([r, l]);
+      else unmatchedR.push([r, b]);
+    }
+    const unmatchedT = state.tb.filter((t) => !usedTb.has(t.idx));
+    sum.textContent = `— ${exact.length} exact, ${fuzzy.length} fuzzy (${fuzzy.filter(([, l]) => l.status === 'pending').length} unconfirmed), ${manual.length} manual, ${unmatchedR.length} roster / ${unmatchedT.length} textbook unmatched`;
+    if (st.anonymize) { el.innerHTML = '<p class="warn">Match review shows real names, so it is hidden while "Anonymize view" is on.</p>'; return; }
+
+    const tbLabel = (t) => `${esc(t.raw)} <span class="small muted">[${esc(t.format)}]</span>`;
+    const nm = (r) => esc(`${r.last}, ${r.first}`);
+    let h = '<div class="two-col"><div>';
+    h += `<h3>(b) Fuzzy matches: confirm or reject</h3>`;
+    h += fuzzy.length ? `<table><thead><tr><th scope="col">Roster</th><th scope="col">Textbook</th><th scope="col">Confidence</th><th scope="col">Action</th></tr></thead><tbody>` +
+      fuzzy.map(([r, l]) => `<tr><th scope="row">${nm(r)}</th><td>${tbLabel(state.tb[l.tbIdx])}</td><td>${fmt(l.conf * 100, 0)}%</td><td>` +
+        (l.status === 'pending'
+          ? `<button type="button" data-act="confirm" data-key="${esc(r.key)}" aria-label="Confirm match for ${nm(r)}">Confirm</button> <button type="button" class="secondary" data-act="reject" data-key="${esc(r.key)}" aria-label="Reject match for ${nm(r)}">Reject</button>`
+          : `<span class="tier None" style="color:var(--ok-fg);font-weight:700">✓ Confirmed</span> <button type="button" class="secondary" data-act="undo" data-key="${esc(r.key)}">Undo</button>`) +
+        '</td></tr>').join('') + '</tbody></table>' : '<p class="muted small">None.</p>';
+
+    h += `<h3>(c) Unmatched roster students: assign manually</h3><p class="small muted">Unmatched means textbook time is <strong>unknown</strong>, not zero. These students are scored on course hours only.</p>`;
+    const opts = unmatchedT.slice().sort((a, b) => a.raw.localeCompare(b.raw)).map((t) => `<option value="${t.idx}">${esc(t.raw)}</option>`).join('');
+    h += unmatchedR.length ? '<table><tbody>' + unmatchedR.map(([r]) => {
+      const id = 'man-' + r.pseudo;
+      return `<tr><th scope="row"><label for="${id}">${nm(r)}</label></th><td><select id="${id}" data-act="manual" data-key="${esc(r.key)}"><option value="">— no match (unknown) —</option>${opts}</select></td></tr>`;
+    }).join('') + '</tbody></table>' : '<p class="muted small">None.</p>';
+    if (manual.length) {
+      h += '<h3>Manual matches</h3><table><tbody>' + manual.map(([r, l]) => `<tr><th scope="row">${nm(r)}</th><td>${tbLabel(state.tb[l.tbIdx])}</td><td><button type="button" class="secondary" data-act="unmanual" data-key="${esc(r.key)}">Remove</button></td></tr>`).join('') + '</tbody></table>';
+    }
+    h += '</div><div>';
+    h += `<h3>(c) Unmatched textbook rows</h3>` + (unmatchedT.length ? '<ul>' + unmatchedT.map((t) => `<li>${tbLabel(t)}: ${t.seconds == null ? 'no time' : fmt(t.seconds / 3600, 2) + ' h'}</li>`).join('') + '</ul>' : '<p class="muted small">None.</p>');
+    h += `<h3>(a) Exact matches (${exact.length})</h3>`;
+    h += exact.length ? '<table><thead><tr><th scope="col">Roster</th><th scope="col">Textbook</th><th scope="col"></th></tr></thead><tbody>' +
+      exact.map(([r, l]) => `<tr><th scope="row">${nm(r)}</th><td>${tbLabel(state.tb[l.tbIdx])}</td><td><button type="button" class="secondary" data-act="reject" data-key="${esc(r.key)}" aria-label="Unlink ${nm(r)}">Unlink</button></td></tr>`).join('') + '</tbody></table>' : '<p class="muted small">None.</p>';
+    h += '</div></div>';
+    el.innerHTML = h;
+  }
+
+  // ---- Unscored list (with conflict resolution) ----
+  function renderUnscored(st) {
+    const el = $('unscored');
+    if (!state.unscored.length) { el.innerHTML = '<p class="muted">None.</p>'; return; }
+    let h = '<div class="table-wrap"><table><thead><tr><th scope="col">Student</th><th scope="col">Reason</th><th scope="col">Values / action</th></tr></thead><tbody>';
+    for (const r of state.unscored) {
+      const es = r.es, nm = esc(displayName(r.s, st.anonymize));
+      let reason, detail = '';
+      if (es.state === 'conflict') {
+        reason = '<strong>Data conflict</strong>: values in more than one modality column';
+        const id = 'conf-' + r.s.pseudo;
+        detail = `<label for="${id}">Choose which value to use: </label><select id="${id}" data-act="conflict" data-key="${esc(r.s.key)}"><option value="">— leave unscored —</option>` +
+          es.populated.map((p) => `<option value="${p.col.index}">${esc(p.col.modality)}: ${esc(p.raw)} / ${p.col.total}</option>`).join('') + '</select>';
+      } else if (es.state === 'nonnumeric') { reason = 'No numeric score'; detail = `"${esc(es.reason)}" (${esc(es.modality)})`; }
+      else { reason = 'No score'; detail = esc(es.reason); }
+      h += `<tr><th scope="row">${nm}</th><td>${reason}</td><td>${detail}</td></tr>`;
+    }
+    el.innerHTML = h + '</tbody></table></div>';
+  }
+
+  function renderExamSelect() {
+    const sel = $('sel-exam');
+    const f = state.files.exam;
+    if (!f) { sel.innerHTML = '<option>Load an exam file</option>'; sel.disabled = true; return; }
+    // One option per assessment, in the order its first column appears in the file.
+    const keys = [...new Set(f.examCols.map((c) => c.key))];
+    if (!keys.length) { sel.innerHTML = '<option>No assessment columns match the keywords</option>'; sel.disabled = true; return; }
+    sel.innerHTML = keys.map((k) => {
+      const cols = f.examCols.filter((c) => c.key === k);
+      return `<option value="${esc(k)}"${k === state.examKey ? ' selected' : ''}>${esc(cols[0].name)} (${esc(cols.map((c) => c.modality).join(' / '))})</option>`;
+    }).join('');
+    sel.disabled = keys.length < 2;
+  }
+
+  function renderAll() {
+    const st = compute();
+    renderExamSelect();
+    renderDiag(st); renderMatch(st); renderTable(st); renderScatter(st); renderUnscored(st);
+    const ok = state.results.length > 0;
+    $('btn-export').disabled = !ok; $('btn-print').disabled = !ok;
+  }
+
+  /* =====================================================================
+   * Loading
+   * ===================================================================== */
+  /** Default assessment: the one with the most numeric scores (ties → the one appearing later in the file). */
+  function chooseDefaultExam() {
+    const f = state.files.exam;
+    const keys = [...new Set(f.examCols.map((c) => c.key))];
+    let best = null, bestN = -1;
+    for (const n of keys) {
+      const cols = f.examCols.filter((c) => c.key === n);
+      const cnt = f.records.filter((r) => cols.some((c) => parseNum(r._raw[c.index]) != null)).length;
+      if (cnt >= bestN) { best = n; bestN = cnt; }
+    }
+    state.examKey = best;
+  }
+
+  function rebuild(kindChanged) {
+    buildRoster(); buildTextbook();
+    if (kindChanged === 'exam' || kindChanged === 'textbook' || kindChanged === 'all') state.decisions = new Map();
+    if (kindChanged === 'exam' || kindChanged === 'all') { state.conflictChoice = new Map(); if (state.files.exam) chooseDefaultExam(); }
+    buildMatches();
+    renderAll();
+  }
+
+  function setStatus(kind, msg, cls) { const el = $('s-' + kind); el.textContent = msg; el.className = 'status ' + (cls || ''); }
+
+  function loadText(kind, text, fileName) {
+    try {
+      const f = ingest(kind, text, fileName);
+      state.files[kind] = f;
+      const extra = kind === 'exam' ? examColsSummary(f) : '';
+      setStatus(kind, `✓ ${fileName}: ${f.records.length} rows, ${f.delimiter === '\t' ? 'tab' : 'comma'}-delimited${extra}` +
+        (f.missingOpt.length ? `. Optional columns missing: ${f.missingOpt.join(', ')}` : ''), 'ok');
+      return true;
+    } catch (e) {
+      state.files[kind] = null;
+      setStatus(kind, '✗ ' + e.message, 'err');
+      return false;
+    }
+  }
+
+  function readFile(kind, file) {
+    if (!file) return;
+    const fr = new FileReader();
+    fr.onload = () => { loadText(kind, decodeBytes(fr.result), file.name); rebuild(kind); };
+    fr.onerror = () => setStatus(kind, '✗ Could not read file.', 'err');
+    fr.readAsArrayBuffer(file);
+  }
+
+  /* =====================================================================
+   * Export / print
+   * ===================================================================== */
+  /** CSV cell: neutralise spreadsheet formulas in text, quote when needed. */
+  function csvCell(v) {
+    if (v == null) return '';
+    let s = String(v);
+    if (typeof v !== 'number' && /^[=+\-@\t\r]/.test(s) && parseNum(s) == null) s = "'" + s;
+    return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  }
+
+  function settingsLine(st) {
+    return `${examLabel(state.examKey)}; column keywords "${$('in-keywords').value}"; exam% >= ${st.floor}; exam percentile >= ${st.pMin}; gap >= ${st.gapMin} (Moderate), >= ${st.gapHigh} (High); ` +
+      `weights course ${Math.round(st.wCourse * 100)}% / textbook ${Math.round((1 - st.wCourse) * 100)}%; exam percentile ${st.withinModality ? 'within modality' : 'whole class'}; practice-accuracy threshold ${st.faaMin}%`;
+  }
+
+  function exportCsv() {
+    const st = compute();
+    const names = $('in-names').checked;
+    const d = state.diag;
+    const lines = [
+      '# Review Priority report: SCREENING AID ONLY, NOT EVIDENCE OF MISCONDUCT',
+      `# Generated: ${new Date().toISOString()}`,
+      `# Settings: ${settingsLine(st)}`,
+      `# Identities: ${names ? 'REAL NAMES INCLUDED. Protect under FERPA.' : 'pseudonyms only'}`,
+      `# Spearman rho (exam% vs course hrs / textbook hrs / combined): ${fmt(d.course.rho, 2)} (n=${d.course.n}) / ${fmt(d.textbook.rho, 2)} (n=${d.textbook.n}) / ${fmt(d.engagement.rho, 2)} (n=${d.engagement.n})`,
+    ];
+    const head = ['Pseudonym'].concat(names ? ['Last Name', 'First Name', 'Username'] : []).concat(
+      ['Exam %', 'Modality', 'Course hours', 'Textbook hours', 'Textbook status', 'Engagement percentile', 'Exam percentile', 'Gap',
+        'Review Priority', 'Weakened by practice data', 'Data flags', 'Overall Grade', 'Missed Due Dates', 'Practices Completed', 'First Attempt Accuracy']);
+    lines.push(head.map(csvCell).join(','));
+    const r2 = (v, dgt) => v == null ? '' : Number(v.toFixed(dgt));
+    for (const r of sortedResults(st)) {
+      lines.push([r.s.pseudo].concat(names ? [r.s.last, r.s.first, r.s.user] : []).concat([
+        r2(r.examPct, 1), r.modality, r2(r.courseHours, 2), r2(r.tbHours, 3), r.tbStatus === 'matched' ? 'matched' : r.tbStatus + ' (unknown)',
+        r2(r.engP, 1), r2(r.examP, 1), r2(r.gap, 1), tierText(r.tier), r.weakened ? 'yes' : '', r.flags.map((f) => f[1]).join('; '),
+        r.overall, r.missed, r.practices, r.faa == null ? '' : r2(r.faa, 0)]).map(csvCell).join(','));
+    }
+    for (const r of state.unscored) {
+      const reason = r.es.state === 'conflict' ? 'NOT SCORED: data conflict (multiple modality values)' : r.es.state === 'nonnumeric' ? `NOT SCORED: "${r.es.reason}"` : `NOT SCORED: ${r.es.reason}`;
+      lines.push([r.s.pseudo].concat(names ? [r.s.last, r.s.first, r.s.user] : []).concat(['', '', r2(r.courseHours, 2), '', '', '', '', '', reason]).map(csvCell).join(','));
+    }
+    const blob = new Blob(['﻿' + lines.join('\r\n') + '\r\n'], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `review-priority-${examLabel(state.examKey).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}-${new Date().toISOString().slice(0, 10)}${names ? '-NAMES' : ''}.csv`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  function printSummary() {
+    const st = compute();
+    const anon = !$('in-names').checked;
+    const d = state.diag;
+    const flagged = sortedResults(st).filter((r) => r.tier === 'High' || r.tier === 'Moderate');
+    let h = `<h1>Review Priority: ${esc(examLabel(state.examKey))}</h1>
+      <p class="disclaimer"><strong>Screening aid only. Not evidence of academic misconduct.</strong> A tier means only that an exam score is unusually high relative to logged engagement.</p>
+      <p class="small">Generated ${esc(new Date().toLocaleString())}. ${esc(settingsLine(st))}. Identities: ${anon ? 'pseudonyms' : 'real names'}.</p>
+      <p class="small">Scored ${d.nScored}, not scored ${d.nUnscored}, partial data ${d.nPartial}. Spearman ρ: course ${fmt(d.course.rho, 2)}, textbook ${fmt(d.textbook.rho, 2)}, combined ${fmt(d.engagement.rho, 2)}.` +
+      (d.engagement.rho == null || Math.abs(d.engagement.rho) < 0.2 ? ' <strong>Warning: engagement weakly predicts scores in this class.</strong>' : '') + '</p>';
+    h += `<h2>Flagged students (${flagged.length})</h2>`;
+    h += flagged.length ? '<table><thead><tr><th>Student</th><th>Exam %</th><th>Modality</th><th>Course h</th><th>Textbook h</th><th>Eng. pctl</th><th>Exam pctl</th><th>Gap</th><th>Tier</th><th>Flags</th></tr></thead><tbody>' +
+      flagged.map((r) => `<tr><td>${esc(displayName(r.s, anon))}</td><td>${fmt(r.examPct)}</td><td>${esc(r.modality)}</td><td>${r.courseHours == null ? 'unknown' : fmt(r.courseHours, 1)}</td><td>${r.tbStatus === 'matched' ? fmt(r.tbHours, 2) : esc(r.tbStatus)}</td><td>${fmt(r.engP, 0)}</td><td>${fmt(r.examP, 0)}</td><td>${fmt(r.gap, 0)}</td><td>${esc(r.tier)}${r.weakened ? ' (weakened by practice data)' : ''}</td><td>${esc(r.flags.map((f) => f[1]).join('; '))}</td></tr>`).join('') +
+      '</tbody></table>' : '<p>No students meet the Review Priority criteria.</p>';
+    $('printSummary').innerHTML = h;
+    document.body.classList.add('printing');
+    const done = () => { document.body.classList.remove('printing'); $('printSummary').innerHTML = ''; window.removeEventListener('afterprint', done); };
+    window.addEventListener('afterprint', done);
+    window.print();
+  }
+
+  /* =====================================================================
+   * Events
+   * ===================================================================== */
+  ['course', 'textbook', 'exam'].forEach((kind) => {
+    $('f-' + kind).addEventListener('change', (e) => readFile(kind, e.target.files[0]));
+  });
+  document.querySelectorAll('.drop').forEach((zone) => {
+    const kind = zone.getAttribute('data-kind');
+    zone.addEventListener('dragover', (e) => { e.preventDefault(); zone.classList.add('over'); });
+    zone.addEventListener('dragleave', () => zone.classList.remove('over'));
+    zone.addEventListener('drop', (e) => { e.preventDefault(); zone.classList.remove('over'); readFile(kind, e.dataTransfer.files[0]); });
+  });
+  // Stop a stray drop elsewhere from navigating the tab away (which would lose all state).
+  window.addEventListener('dragover', (e) => e.preventDefault());
+  window.addEventListener('drop', (e) => e.preventDefault());
+
+  ['in-floor', 'in-pmin', 'in-gap', 'in-high', 'in-faa', 'in-weight', 'in-withinmod', 'in-anon'].forEach((id) => $(id).addEventListener('input', renderAll));
+  ['in-withinmod', 'in-anon'].forEach((id) => $(id).addEventListener('change', renderAll));
+  $('sel-exam').addEventListener('change', (e) => { state.examKey = e.target.value; renderAll(); });
+  // Changing keywords re-detects assessment columns from the already-loaded headers (no reload needed).
+  $('in-keywords').addEventListener('change', () => {
+    const f = state.files.exam;
+    if (!f) return;
+    f.examCols = detectExamCols(f.headers, $('in-keywords').value);
+    if (f.examCols.length) setStatus('exam', `✓ ${f.fileName}: ${f.records.length} rows${examColsSummary(f)}`, 'ok');
+    else setStatus('exam', `✗ No score columns in "${f.fileName}" contain the keywords "${$('in-keywords').value}". Score columns found: ` +
+      f.headers.filter((h) => GC_COL_RE.test(h)).map((h) => `"${h}"`).join(', '), 'err');
+    state.conflictChoice = new Map();
+    state.examKey = null;
+    if (f.examCols.length) chooseDefaultExam();
+    renderAll();
+  });
+
+  $('results').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-sort]');
+    if (!b) return;
+    const k = b.getAttribute('data-sort');
+    state.sort = { key: k, dir: state.sort.key === k ? -state.sort.dir : (k === 'name' || k === 'modality' ? 1 : -1) };
+    renderAll();
+    const again = document.querySelector(`button[data-sort="${k}"]`); if (again) again.focus();
+  });
+
+  // Match review + conflict actions (event delegation).
+  function onAction(e) {
+    const t = e.target.closest('[data-act]');
+    if (!t) return;
+    const act = t.getAttribute('data-act'), key = t.getAttribute('data-key');
+    if (e.type === 'click' && t.tagName === 'SELECT') return;
+    if (act === 'confirm') state.decisions.set(key, { type: 'confirm' });
+    else if (act === 'reject') state.decisions.set(key, { type: 'reject' });
+    else if (act === 'undo') state.decisions.delete(key);
+    else if (act === 'unmanual') { state.matchBase.has(key) ? state.decisions.set(key, { type: 'reject' }) : state.decisions.delete(key); }
+    else if (act === 'manual') {
+      if (t.value === '') return;
+      state.decisions.set(key, { type: 'manual', tbIdx: +t.value });
+    } else if (act === 'conflict') {
+      const k = key + '|' + state.examKey;
+      t.value === '' ? state.conflictChoice.delete(k) : state.conflictChoice.set(k, +t.value);
+    } else return;
+    renderAll();
+  }
+  ['match', 'unscored'].forEach((id) => { $(id).addEventListener('click', onAction); $(id).addEventListener('change', onAction); });
+
+  const sc = $('scatter');
+  sc.addEventListener('mousemove', (e) => { const p = e.target.closest('[data-i]'); p ? showTip(p, e.clientX, e.clientY) : hideTip(); });
+  sc.addEventListener('mouseleave', hideTip);
+  sc.addEventListener('focusin', (e) => { const p = e.target.closest('[data-i]'); if (p) showTip(p); });
+  sc.addEventListener('focusout', hideTip);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') hideTip(); });
+
+  $('btn-export').addEventListener('click', exportCsv);
+  $('btn-print').addEventListener('click', printSummary);
+
+  $('btn-clear').addEventListener('click', () => {
+    state = freshState();
+    ['course', 'textbook', 'exam'].forEach((k) => { $('f-' + k).value = ''; setStatus(k, 'Drop a file here or choose one.'); });
+    $('in-names').checked = false; $('in-anon').checked = false;
+    $('printSummary').innerHTML = ''; hideTip();
+    renderAll();
+    $('diag').innerHTML = '<p class="muted">All data cleared from memory.</p>';
+  });
+
+  /* =====================================================================
+   * Synthetic demo data: ALL NAMES ARE FAKE.
+   * Edge cases covered:
+   *  - course file: UTF-8 BOM, CRLF, quoted field with an embedded comma ("Pretendo, Jr.")
+   *  - textbook file: TAB-delimited; "Last, First" rows; accent (Zoë/Zoe); suffix ("Jon Pretendo, Jr.");
+   *    misspellings for fuzzy matching (Lou/Lu, Psuedonym/Pseudonym); thousands separator ("36,000");
+   *    a matched student with 0 seconds (Mockley); a roster student with no textbook row (Unmatchedly);
+   *    a textbook row with no roster student (Strayrow)
+   *  - exam file: two modalities for Exam 1 plus Exam 2; both modality columns populated (Notreal);
+   *    "Needs Grading", "In Progress", "Exempt", "-", blank; blank Username (joins on Student ID);
+   *    tied exam scores (170) and tied course hours (12.0, 15.0)
+   *  - demo25–34 are "ordinary" students whose engagement tracks their score, so the class-level
+   *    correlation is realistic rather than dominated by the edge cases above
+   * ===================================================================== */
+  const DEMO_COURSE = '﻿' + [
+    'Last Name,First Name,Username,Student ID,Overall Grade,Overall Grade Alert,Missed Due Dates,Missed Due Dates Alert,Hours in Course,Last Access Date,Days Since Last Access,Days Since Last Access Alert',
+    'Fakename,Ada,demo01,900001,71.2%,,4,Yes,2.0,2026-10-01,13,Yes',
+    'Samplesson,Bo,demo02,900002,93.5%,,0,,25.5,2026-10-13,1,',
+    'Placeholder,Cy,demo03,900003,78.0%,,1,,12.0,2026-10-12,2,',
+    'Mockley,Dee,demo04,900004,68.4%,,5,Yes,3.0,2026-10-05,9,',
+    'Testcase,Eli,demo05,900005,84.1%,,1,,12.0,2026-10-11,3,',
+    'Dummyworth,Fay,demo06,900006,80.0%,,2,,18.0,2026-10-12,2,',
+    'Notreal,Gus,demo07,900007,75.3%,,3,,4.0,2026-10-08,6,',
+    'Examplar,Hal,demo08,900008,55.0%,Yes,7,Yes,1.5,2026-09-28,16,Yes',
+    'Imaginary,Zoë,demo09,900009,88.0%,,0,,20.0,2026-10-13,1,',
+    '"Pretendo, Jr.",Jon,demo10,900010,82.0%,,1,,4.0,2026-10-10,4,',
+    'Synthetic,Kai,demo11,900011,90.2%,,0,,2.5,2026-10-09,5,',
+    'Madeup,Lu,demo12,900012,79.0%,,2,,10.0,2026-10-12,2,',
+    'Unmatchedly,Mo,demo13,900013,74.0%,,3,,1.0,2026-10-02,12,Yes',
+    'Fakerson,Nia,demo14,900014,86.0%,,1,,15.0,2026-10-13,1,',
+    'Testington,Oz,demo15,900015,81.0%,,1,,15.0,2026-10-12,2,',
+    'Bogus,Pip,demo16,900016,96.0%,,0,,22.0,2026-10-13,1,',
+    'Hypothetical,Quinn,demo17,900017,77.0%,,2,,8.0,2026-10-11,3,',
+    'Simulacra,Rae,demo18,900018,72.0%,,4,,6.0,2026-10-07,7,',
+    'Nonesuch,Sol,demo19,900019,73.0%,,1,,30.0,2026-10-13,1,',
+    'Pseudonym,Tia,demo20,900020,80.0%,,2,,5.0,2026-10-10,4,',
+    'Ersatz,Uma,demo21,900021,85.0%,,0,,14.0,2026-10-12,2,',
+    'Lorem,Vic,demo22,900022,83.0%,,1,,11.0,2026-10-12,2,',
+    'Ipsum,Wren,demo23,900023,79.0%,,2,,7.0,2026-10-11,3,',
+    'Dolorsit,Xan,demo24,900024,65.0%,,6,Yes,16.0,2026-10-06,8,',
+    'Phantom,Abe,demo25,900025,62.0%,,5,Yes,3.5,2026-10-04,10,',
+    'Figment,Bea,demo26,900026,74.0%,,2,,6.5,2026-10-11,3,',
+    'Invented,Cal,demo27,900027,89.0%,,0,,19.0,2026-10-13,1,',
+    'Contrived,Dot,demo28,900028,92.0%,,0,,24.0,2026-10-13,1,',
+    'Specimen,Eve,demo29,900029,82.0%,,1,,13.5,2026-10-12,2,',
+    'Hollowe,Finn,demo30,900030,67.0%,,3,,4.5,2026-10-09,5,',
+    'Notional,Gil,demo31,900031,58.0%,,6,Yes,2.8,2026-10-03,11,Yes',
+    'Facsimile,Hana,demo32,900032,95.0%,,0,,21.0,2026-10-13,1,',
+    'Stand-in,Ike,demo33,900033,80.0%,,1,,9.5,2026-10-12,2,',
+    'Surrogate,Jo,demo34,900034,90.0%,,0,,17.5,2026-10-13,1,',
+  ].join('\r\n') + '\r\n';
+
+  const TB_H = ['Student Name', 'Total Time(seconds)', 'Avg. Session Length (seconds)', 'Sessions', 'Pages', 'Annotations', 'Last Activity', 'Practices Completed', 'First Attempt Accuracy'];
+  const DEMO_TEXTBOOK = [TB_H].concat([
+    ['Ada Fakename', '600', '300', '2', '8', '0', '2026-09-20', '2', '55%'],
+    ['Samplesson, Bo', '36,000', '1800', '20', '310', '42', '2026-10-12', '40', '88%'],
+    ['Cy Placeholder', '14400', '1440', '10', '150', '5', '2026-10-11', '20', '70%'],
+    ['Dee Mockley', '0', '0', '0', '0', '0', '', '0', ''],
+    ['Testcase, Eli', '18000', '1500', '12', '180', '9', '2026-10-10', '25', '76%'],
+    ['Dummyworth, Fay', '15000', '1250', '12', '160', '3', '2026-10-11', '22', '74%'],
+    ['Gus Notreal', '2400', '600', '4', '30', '0', '2026-10-01', '5', '62%'],
+    ['Hal Examplar', '300', '300', '1', '4', '0', '2026-09-15', '1', '40%'],
+    ['Zoe Imaginary', '30000', '1765', '17', '260', '20', '2026-10-12', '35', '85%'],
+    ['Jon Pretendo, Jr.', '3600', '900', '4', '40', '1', '2026-10-08', '30', '92%'],
+    ['Kai Synthetic', '1800', '600', '3', '25', '0', '2026-10-07', '45', '94%'],
+    ['Lou Madeup', '12000', '1200', '10', '120', '4', '2026-10-11', '18', '72%'],
+    ['Fakerson, Nia', '21600', '1662', '13', '200', '11', '2026-10-12', '28', '80%'],
+    ['Oz Testington', '9000', '1000', '9', '95', '2', '2026-10-10', '15', '71%'],
+    ['Pip Bogus', '40000', '2000', '20', '350', '38', '2026-10-13', '50', '95%'],
+    ['Quinn Hypothetical', '7200', '900', '8', '80', '2', '2026-10-09', '12', '68%'],
+    ['Rae Simulacra', '5000', '833', '6', '60', '1', '2026-10-06', '8', '65%'],
+    ['Sol Nonesuch', '50000', '2000', '25', '400', '55', '2026-10-13', '60', '68%'],
+    ['Tia Psuedonym', '4000', '800', '5', '45', '0', '2026-10-08', '10', '60%'],
+    ['Uma Ersatz', '16000', '1333', '12', '170', '6', '2026-10-11', '24', '83%'],
+    ['Vic Lorem', '10800', '1200', '9', '110', '3', '2026-10-11', '16', '73%'],
+    ['Ipsum, Wren', '5400', '900', '6', '55', '1', '2026-10-10', '9', '66%'],
+    ['Xan Dolorsit', '8000', '1000', '8', '85', '2', '2026-10-05', '11', '58%'],
+    ['Yuri Strayrow', '9999', '1111', '9', '100', '0', '2026-10-04', '10', '70%'],
+    ['Abe Phantom', '1200', '400', '3', '15', '0', '2026-10-01', '3', '50%'],
+    ['Figment, Bea', '6000', '857', '7', '70', '1', '2026-10-10', '10', '64%'],
+    ['Cal Invented', '26000', '1529', '17', '240', '14', '2026-10-12', '33', '84%'],
+    ['Dot Contrived', '33000', '1650', '20', '300', '25', '2026-10-13', '42', '90%'],
+    ['Eve Specimen', '15500', '1292', '12', '165', '7', '2026-10-11', '21', '75%'],
+    ['Finn Hollowe', '3000', '600', '5', '35', '0', '2026-10-08', '6', '57%'],
+    ['Gil Notional', '900', '300', '3', '10', '0', '2026-10-02', '2', '45%'],
+    ['Hana Facsimile', '30000', '1765', '17', '280', '22', '2026-10-13', '38', '91%'],
+    ['Ike Stand-in', '10000', '1111', '9', '105', '3', '2026-10-11', '15', '72%'],
+    ['Jo Surrogate', '20000', '1538', '13', '210', '12', '2026-10-12', '27', '86%'],
+  ]).map((r) => r.join('\t')).join('\n');
+
+  const EX_H = ['Last Name', 'First Name', 'Username', 'Student ID', 'Last Access', 'Availability',
+    'Testing Center - Exam 1 [Total Pts: 200 Score] |6430020', 'Respondus Monitor - Exam 1 [Total Pts: 200 Score] |6430021',
+    'Testing Center - Exam 2 [Total Pts: 150 Score] |6430030',
+    'Unit 3 Quiz [Total Pts: 20 Score] |6430040', 'Homework 1 [Total Pts: 10 Score] |6430050'];
+  // Unit 3 Quiz: no modality prefix, scored for only a few students. Homework 1: no keyword, so it must be ignored.
+  const exRow = (l, f, u, id, tc, rm, e2, q = '') => [l, f, u, id, '2026-10-13', 'Yes', tc, rm, e2, q, '9'];
+  const DEMO_EXAM = [EX_H,
+    exRow('Fakename', 'Ada', 'demo01', '900001', '192', '', '140', '19'),
+    exRow('Samplesson', 'Bo', 'demo02', '900002', '180', '', '138'),
+    exRow('Placeholder', 'Cy', 'demo03', '900003', '', '150', ''),
+    exRow('Mockley', 'Dee', 'demo04', '900004', '', '178', ''),
+    exRow('Testcase', 'Eli', 'demo05', '900005', '170', '', '120'),
+    exRow('Dummyworth', 'Fay', 'demo06', '900006', 'Needs Grading', '', ''),
+    exRow('Notreal', 'Gus', 'demo07', '900007', '186', '184', ''),
+    exRow('Examplar', 'Hal', 'demo08', '900008', '120', '', ''),
+    exRow('Imaginary', 'Zoë', 'demo09', '900009', '', '176', ''),
+    exRow('Pretendo, Jr.', 'Jon', 'demo10', '900010', '182', '', ''),
+    exRow('Synthetic', 'Kai', 'demo11', '900011', '190', '', ''),
+    exRow('Madeup', 'Lu', 'demo12', '900012', '160', '', ''),
+    exRow('Unmatchedly', 'Mo', 'demo13', '900013', '', '184', ''),
+    exRow('Fakerson', 'Nia', 'demo14', '900014', '170', '', ''),
+    exRow('Testington', 'Oz', '', '900015', '164', '', ''),
+    exRow('Bogus', 'Pip', 'demo16', '900016', '', '196', '', '20'),
+    exRow('Hypothetical', 'Quinn', 'demo17', '900017', '154', '', ''),
+    exRow('Simulacra', 'Rae', 'demo18', '900018', 'In Progress', '', ''),
+    exRow('Nonesuch', 'Sol', 'demo19', '900019', '182', '', ''),
+    exRow('Pseudonym', 'Tia', 'demo20', '900020', '172', '', ''),
+    exRow('Ersatz', 'Uma', 'demo21', '900021', 'Exempt', '', ''),
+    exRow('Lorem', 'Vic', 'demo22', '900022', '166', '', '', '15'),
+    exRow('Ipsum', 'Wren', 'demo23', '900023', '', '174', ''),
+    exRow('Dolorsit', 'Xan', 'demo24', '900024', '-', '', ''),
+    exRow('Phantom', 'Abe', 'demo25', '900025', '128', '', ''),
+    exRow('Figment', 'Bea', 'demo26', '900026', '', '146', ''),
+    exRow('Invented', 'Cal', 'demo27', '900027', '178', '', ''),
+    exRow('Contrived', 'Dot', 'demo28', '900028', '', '184', ''),
+    exRow('Specimen', 'Eve', 'demo29', '900029', '162', '', ''),
+    exRow('Hollowe', 'Finn', 'demo30', '900030', '136', '', ''),
+    exRow('Notional', 'Gil', 'demo31', '900031', '118', '', ''),
+    exRow('Facsimile', 'Hana', 'demo32', '900032', '', '188', ''),
+    exRow('Stand-in', 'Ike', 'demo33', '900033', '156', '', ''),
+    exRow('Surrogate', 'Jo', 'demo34', '900034', '180', '', ''),
+  ].map((r) => r.map((v) => '"' + v.replace(/"/g, '""') + '"').join(',')).join('\r\n');
+
+  $('btn-demo').addEventListener('click', () => {
+    loadText('course', DEMO_COURSE, 'demo-course.csv');
+    loadText('textbook', DEMO_TEXTBOOK, 'demo-textbook.tsv');
+    loadText('exam', DEMO_EXAM, 'demo-exam.csv');
+    rebuild('all');
+  });
+
+  renderAll();
+})();
+</script>
+</body>
+</html>

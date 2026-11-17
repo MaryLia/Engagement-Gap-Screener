@@ -1,0 +1,16 @@
+# Never commit student data
+*.csv
+*.tsv
+*.xlsx
+*.xls
+*.txt
+exports/
+data/
+reports/
+
+# OS / editor clutter
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
